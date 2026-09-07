@@ -15,9 +15,10 @@ import { COMPANY_INFO, CORE_SERVICES } from '../data/content';
 
 interface FooterProps {
   onOpenQuoteModal: () => void;
+  onOpenDatabasePortal?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onOpenQuoteModal }) => {
+export const Footer: React.FC<FooterProps> = ({ onOpenQuoteModal, onOpenDatabasePortal }) => {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -225,14 +226,22 @@ export const Footer: React.FC<FooterProps> = ({ onOpenQuoteModal }) => {
           <p>
             {COMPANY_INFO.copyright}
           </p>
-          <div className="flex items-center space-x-4 text-[11px] text-slate-400">
+          <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
             <span className="text-amber-400/90 font-medium">Builder Licence : {COMPANY_INFO.builderLicence}</span>
             <span>•</span>
             <span>NSW 2210 Australia</span>
             <span>•</span>
-            <span>Privacy Policy</span>
-            <span>•</span>
-            <span>Terms of Engagement</span>
+            {onOpenDatabasePortal && (
+              <button
+                onClick={onOpenDatabasePortal}
+                id="footer-open-db-portal-btn"
+                className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-300 font-medium border border-amber-400/20 transition-colors cursor-pointer"
+                title="View cloud database connection & leads"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span>Database Portal</span>
+              </button>
+            )}
           </div>
         </div>
 

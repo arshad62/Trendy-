@@ -1,0 +1,90 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Functions
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Inquiry Validator
+    function isValidInquiry(data) {
+      return data.keys().hasAll(['fullName', 'email', 'message', 'source', 'status', 'createdAt']) &&
+        data.fullName is string && data.fullName.size() > 0 && data.fullName.size() <= 100 &&
+        data.email is string && data.email.size() > 3 && data.email.size() <= 150 &&
+        data.message is string && data.message.size() > 0 && data.message.size() <= 2000 &&
+        data.source in ['quote_modal', 'contact_section', 'estimator'] &&
+        data.status in ['new', 'reviewed', 'contacted', 'quoted', 'archived'] &&
+        data.createdAt == request.time &&
+        (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
+        (!('projectType' in data) || (data.projectType is string && data.projectType.size() <= 100)) &&
+        (!('budget' in data) || (data.budget is string && data.budget.size() <= 100)) &&
+        (!('timeline' in data) || (data.timeline is string && data.timeline.size() <= 100)) &&
+        (!('location' in data) || (data.location is string && data.location.size() <= 200)) &&
+        (!('attachmentUrl' in data) || (data.attachmentUrl is string && data.attachmentUrl.size() <= 1000)) &&
+        (!('attachmentName' in data) || (data.attachmentName is string && data.attachmentName.size() <= 250));
+    }
+
+    // Estimate Validator
+    function isValidEstimate(data) {
+      return data.keys().hasAll(['projectCategory', 'floorArea', 'qualityTier', 'estimatedMin', 'estimatedMax', 'createdAt']) &&
+        data.projectCategory is string && data.projectCategory.size() > 0 && data.projectCategory.size() <= 100 &&
+        data.floorArea is number && data.floorArea > 0 && data.floorArea <= 500000 &&
+        data.qualityTier is string && data.qualityTier.size() > 0 && data.qualityTier.size() <= 50 &&
+        data.estimatedMin is number && data.estimatedMin >= 0 &&
+        data.estimatedMax is number && data.estimatedMax >= data.estimatedMin &&
+        data.createdAt == request.time &&
+        (!('clientName' in data) || (data.clientName is string && data.clientName.size() <= 100)) &&
+        (!('clientEmail' in data) || (data.clientEmail is string && data.clientEmail.size() <= 150)) &&
+        (!('projectSubtype' in data) || (data.projectSubtype is string && data.projectSubtype.size() <= 100));
+    }
+
+    // Inquiries Collection
+    match /inquiries/{inquiryId} {
+      // Prospective clients can submit inquiries directly from quote form or contact section
+      allow create: if isValidId(inquiryId) && isValidInquiry(incoming());
+      
+      // Reading and administrative management
+      // Allow read for staff or public inquiry confirmation
+      allow get: if isValidId(inquiryId);
+      allow list: if isSignedIn();
+      
+      // Update inquiry status
+      allow update: if isValidId(inquiryId) && 
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+        incoming().status in ['new', 'reviewed', 'contacted', 'quoted', 'archived'] &&
+        incoming().updatedAt == request.time;
+    }
+
+    // Estimates Collection
+    match /estimates/{estimateId} {
+      // Prospective clients can calculate and save cost estimates
+      allow create: if isValidId(estimateId) && isValidEstimate(incoming());
+      allow get: if isValidId(estimateId);
+      allow list: if isSignedIn();
+    }
+
+    // Team Photos Collection
+    match /team_photos/{memberId} {
+      allow read: if isValidId(memberId);
+      allow write: if isValidId(memberId);
+    }
+  }
+}

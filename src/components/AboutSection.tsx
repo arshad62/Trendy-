@@ -19,8 +19,17 @@ import {
   Phone,
   Mail,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Camera,
+  UploadCloud,
+  Loader2,
+  Cloud
 } from 'lucide-react';
+import { 
+  uploadFileToFirebaseStorage, 
+  saveTeamMemberPhoto, 
+  getTeamMemberPhoto 
+} from '../lib/firebase';
 import { 
   COMPANY_INFO, 
   CORE_VALUES, 
@@ -37,6 +46,126 @@ interface AboutSectionProps {
 export const AboutSection: React.FC<AboutSectionProps> = ({ onOpenQuoteModal }) => {
   const [openFaqId, setOpenFaqId] = useState<string | null>('faq-licensing');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [customPhotos, setCustomPhotos] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem('trendy_team_photos');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [uploadingState, setUploadingState] = useState<Record<string, { isUploading: boolean; progress: number; message?: string }>>({});
+
+  // Sync cloud photos from Firestore on mount
+  React.useEffect(() => {
+    LEADERSHIP_TEAM.forEach(async (member) => {
+      try {
+        const cloudUrl = await getTeamMemberPhoto(member.id);
+        if (cloudUrl) {
+          setCustomPhotos((prev) => ({ ...prev, [member.id]: cloudUrl }));
+        }
+      } catch (err) {
+        console.warn(`Could not load cloud photo for ${member.id}:`, err);
+      }
+    });
+  }, []);
+
+  const processPhotoUpload = async (memberId: string, file: File) => {
+    if (!file || !file.type.startsWith('image/')) {
+      alert('Please upload an image file (JPG, PNG, WEBP, or SVG).');
+      return;
+    }
+
+    // Set uploading state
+    setUploadingState((prev) => ({
+      ...prev,
+      [memberId]: { isUploading: true, progress: 15, message: 'Initiating Firebase Storage upload...' }
+    }));
+
+    try {
+      // 1. Upload directly to Firebase Storage bucket in production mode
+      const uploadResult = await uploadFileToFirebaseStorage(
+        'team_photos',
+        file,
+        (progressPercent) => {
+          setUploadingState((prev) => ({
+            ...prev,
+            [memberId]: { 
+              isUploading: true, 
+              progress: Math.max(15, progressPercent), 
+              message: `Uploading to Firebase Storage (${progressPercent}%)...` 
+            }
+          }));
+        }
+      );
+
+      // 2. Upload successful! Get Firebase Storage download URL
+      const storageDownloadUrl = uploadResult.url;
+
+      setCustomPhotos((prev) => {
+        const updated = { ...prev, [memberId]: storageDownloadUrl };
+        try {
+          localStorage.setItem('trendy_team_photos', JSON.stringify(updated));
+        } catch {
+          // ignore
+        }
+        return updated;
+      });
+
+      // 3. Persist to Firestore
+      await saveTeamMemberPhoto(memberId, storageDownloadUrl);
+
+      setUploadingState((prev) => ({
+        ...prev,
+        [memberId]: { isUploading: false, progress: 100, message: 'Stored in Firebase Storage' }
+      }));
+    } catch (storageError) {
+      console.warn('Firebase Storage upload note:', storageError);
+      
+      // Fallback: Read as local data URL so the user's uploaded photo still renders immediately
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        if (result) {
+          setCustomPhotos((prev) => {
+            const updated = { ...prev, [memberId]: result };
+            try {
+              localStorage.setItem('trendy_team_photos', JSON.stringify(updated));
+            } catch {
+              // ignore
+            }
+            return updated;
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+
+      setUploadingState((prev) => ({
+        ...prev,
+        [memberId]: { 
+          isUploading: false, 
+          progress: 100, 
+          message: 'Saved to local cache' 
+        }
+      }));
+    }
+  };
+
+  const handlePhotoUpload = (memberId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      processPhotoUpload(memberId, file);
+    }
+    event.target.value = '';
+  };
+
+  const handlePhotoDrop = (memberId: string, event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const file = event.dataTransfer.files?.[0];
+    if (file) {
+      processPhotoUpload(memberId, file);
+    }
+  };
 
   const categories = ['All', 'Licensing & Compliance', 'Insurance & Protection', 'Project Timelines', 'Process & Procurement'];
 
@@ -214,64 +343,132 @@ export const AboutSection: React.FC<AboutSectionProps> = ({ onOpenQuoteModal }) 
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {LEADERSHIP_TEAM.map((member) => (
-              <div
-                key={member.id}
-                className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden group hover:-translate-y-1"
-                id={`team-member-${member.id}`}
-              >
-                {/* Photo with gradient overlay */}
-                <div className="relative h-64 w-full bg-slate-800 overflow-hidden">
-                  <img
-                    src={member.image}
-                    alt={member.name}
-                    className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      // Fallback if image network fails
-                      (e.target as HTMLElement).style.display = 'none';
-                    }}
-                  />
-                  {/* Fallback initials avatar if image doesn't load */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-[#1A2434] flex flex-col items-center justify-center p-4 text-center -z-10">
-                    <div className="w-20 h-20 rounded-full bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-amber-400 text-2xl font-black mb-2">
-                      {member.name.split(' ').map(n => n[0]).join('')}
+            {LEADERSHIP_TEAM.map((member) => {
+              const displayImage = customPhotos[member.id] || member.image;
+              const hasCustomPhoto = Boolean(customPhotos[member.id]);
+
+              return (
+                <div
+                  key={member.id}
+                  className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden group hover:-translate-y-1"
+                  id={`team-member-${member.id}`}
+                >
+                  {/* Photo with gradient overlay */}
+                  <div 
+                    className="relative h-64 w-full bg-slate-800 overflow-hidden"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => handlePhotoDrop(member.id, e)}
+                  >
+                    <img
+                      src={displayImage}
+                      alt={member.name}
+                      className={`w-full h-full object-cover ${
+                        member.id === 'sohail' ? 'object-top sm:object-[center_10%]' : 'object-top'
+                      } group-hover:scale-105 transition-transform duration-500`}
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (
+                          member.fallbackImage &&
+                          target.src !== member.fallbackImage &&
+                          !target.src.endsWith(member.fallbackImage)
+                        ) {
+                          target.src = member.fallbackImage;
+                        } else {
+                          target.style.display = 'none';
+                        }
+                      }}
+                    />
+
+                    {/* Uploading Spinner Overlay */}
+                    {uploadingState[member.id]?.isUploading && (
+                      <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-xs z-30 flex flex-col items-center justify-center p-4 text-center text-white space-y-2.5">
+                        <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+                        <div>
+                          <span className="text-xs font-bold text-amber-300 block">Firebase Storage</span>
+                          <span className="text-[11px] text-slate-300 leading-tight block mt-0.5">
+                            {uploadingState[member.id]?.message || 'Uploading photo to bucket...'}
+                          </span>
+                        </div>
+                        <div className="w-36 bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                          <div 
+                            className="bg-amber-400 h-full transition-all duration-300"
+                            style={{ width: `${uploadingState[member.id]?.progress || 15}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Change Photo input & button */}
+                    <input
+                      type="file"
+                      id={`photo-input-${member.id}`}
+                      className="hidden"
+                      accept="image/*"
+                      onChange={(e) => handlePhotoUpload(member.id, e)}
+                    />
+                    <label
+                      htmlFor={`photo-input-${member.id}`}
+                      id={`btn-change-photo-${member.id}`}
+                      className="absolute top-3 right-3 z-20 flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-900 text-white text-xs font-semibold border border-amber-400/40 backdrop-blur-md cursor-pointer transition-all shadow-lg hover:scale-105 group/btn"
+                      title={`Upload exact photo file for ${member.name} directly to Firebase Storage bucket`}
+                    >
+                      <Camera className="w-3.5 h-3.5 text-amber-400 group-hover/btn:scale-110 transition-transform" />
+                      <span>{uploadingState[member.id]?.isUploading ? 'Uploading...' : hasCustomPhoto ? 'Change Photo' : 'Upload Photo'}</span>
+                    </label>
+
+                    {/* Cloud Storage Badge if photo has been customized */}
+                    {hasCustomPhoto && !uploadingState[member.id]?.isUploading && (
+                      <div 
+                        className="absolute top-3 left-3 z-20 flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-900/90 text-emerald-300 text-[10px] font-bold border border-emerald-500/40 backdrop-blur-xs shadow-md"
+                        title="Stored in Firebase Cloud Storage"
+                      >
+                        <Cloud className="w-3 h-3 text-emerald-400" />
+                        <span>Cloud Storage</span>
+                      </div>
+                    )}
+
+                    {/* Fallback initials avatar if image doesn't load */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-[#1A2434] flex flex-col items-center justify-center p-4 text-center -z-10">
+                      <div className="w-20 h-20 rounded-full bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-amber-400 text-2xl font-black mb-2">
+                        {member.name.split(' ').map(n => n[0]).join('')}
+                      </div>
+                      <span className="text-white font-bold text-sm">{member.name}</span>
                     </div>
-                    <span className="text-white font-bold text-sm">{member.name}</span>
+
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#1A2434] via-transparent to-transparent pointer-events-none"></div>
+                    
+                    <div className="absolute bottom-3 left-4 right-4 pointer-events-none">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">
+                        {member.experience}
+                      </span>
+                      <h5 className="text-lg font-bold text-white leading-tight">
+                        {member.name}
+                      </h5>
+                    </div>
                   </div>
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#1A2434] via-transparent to-transparent"></div>
-                  
-                  <div className="absolute bottom-3 left-4 right-4">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">
-                      {member.experience}
-                    </span>
-                    <h5 className="text-lg font-bold text-white leading-tight">
-                      {member.name}
-                    </h5>
+                  {/* Info */}
+                  <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">
+                        {member.title}
+                      </p>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        {member.roleDescription}
+                      </p>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 space-y-2 text-[11px] text-slate-500">
+                      <div className="flex items-start space-x-1.5">
+                        <GraduationCap className="w-3.5 h-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <span className="line-clamp-2">{member.qualifications}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                {/* Info */}
-                <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                  <div className="space-y-2">
-                    <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">
-                      {member.title}
-                    </p>
-                    <p className="text-xs text-slate-600 leading-relaxed">
-                      {member.roleDescription}
-                    </p>
-                  </div>
-
-                  <div className="pt-3 border-t border-slate-100 space-y-2 text-[11px] text-slate-500">
-                    <div className="flex items-start space-x-1.5">
-                      <GraduationCap className="w-3.5 h-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
-                      <span className="line-clamp-2">{member.qualifications}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

@@ -413,13 +413,13 @@ export const TESTIMONIALS: TestimonialItem[] = [
 export const LEADERSHIP_TEAM: TeamMember[] = [
   {
     id: 'sohail',
-    name: 'Sohail Siddiqui',
+    name: 'Sohail Shamsi',
     title: 'Founder & Managing Director',
     roleDescription: 'Sohail provides executive leadership and strategic direction across Trendy Constructions Pty Ltd. With over 25 years of senior tier-1 construction, civil engineering, and project development experience, he has overseen more than $1.2B in delivered capital projects across Australia.',
     experience: '25+ Years Construction & Project Leadership',
-    qualifications: 'B.Eng (Civil), M.ProjMgt, Registered Building Practitioner (VBA CDB-U)',
-    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80',
-    fallbackImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80',
+    qualifications: 'B.Eng (Civil), M.ProjMgt, Registered Building Practitioner (NSW Licence: 184663C)',
+    image: '/assets/Sohail.jpg',
+    fallbackImage: '/assets/sohail_speaking.jpg',
     linkedInUrl: 'https://linkedin.com',
   },
   {

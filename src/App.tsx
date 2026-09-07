@@ -13,6 +13,8 @@ import { Footer } from './components/Footer';
 import { ProjectDetailModal } from './components/ProjectDetailModal';
 import { ServiceScopeModal } from './components/ServiceScopeModal';
 import { QuoteModal } from './components/QuoteModal';
+import { DatabasePortalModal } from './components/DatabasePortalModal';
+import { testFirestoreConnection } from './lib/firebase';
 import { ProjectItem, ServiceItem } from './types';
 import { CORE_SERVICES } from './data/content';
 
@@ -21,8 +23,14 @@ export default function App() {
   const [selectedProject, setSelectedProject] = useState<ProjectItem | null>(null);
   const [selectedServiceForScope, setSelectedServiceForScope] = useState<ServiceItem | null>(null);
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
+  const [isDbPortalOpen, setIsDbPortalOpen] = useState(false);
   const [prefilledService, setPrefilledService] = useState('Project Management');
   const [prefilledMessage, setPrefilledMessage] = useState('');
+
+  React.useEffect(() => {
+    // Validate Firestore connection on boot as mandated by skill guidelines
+    testFirestoreConnection();
+  }, []);
 
   // Handlers
   const handleOpenQuoteModal = (serviceName?: string, customMessage?: string) => {
@@ -125,7 +133,10 @@ Please prepare a formal feasibility review and arrange an introductory conferenc
       </main>
 
       {/* Footer */}
-      <Footer onOpenQuoteModal={() => handleOpenQuoteModal()} />
+      <Footer 
+        onOpenQuoteModal={() => handleOpenQuoteModal()} 
+        onOpenDatabasePortal={() => setIsDbPortalOpen(true)}
+      />
 
       {/* Interactive Modals */}
       <ProjectDetailModal
@@ -148,6 +159,11 @@ Please prepare a formal feasibility review and arrange an introductory conferenc
         onClose={() => setIsQuoteModalOpen(false)}
         prefilledService={prefilledService}
         prefilledMessage={prefilledMessage}
+      />
+
+      <DatabasePortalModal
+        isOpen={isDbPortalOpen}
+        onClose={() => setIsDbPortalOpen(false)}
       />
     </div>
   );

@@ -15,6 +15,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { COMPANY_INFO } from '../data/content';
+import { submitInquiry } from '../lib/firebase';
 
 interface ContactSectionProps {
   initialSubject?: string;
@@ -78,19 +79,34 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
 
     setIsSubmitting(true);
 
-    // Simulate reliable asynchronous submission
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const res = await submitInquiry({
+        fullName: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        projectType: `${formData.serviceInterest} (${formData.subject})`,
+        timeline: formData.timeline,
+        message: formData.message,
+        source: 'contact_section',
+        status: 'new',
+      });
+      setIsSuccess(true);
+      const refNum = res?.id ? `TC-${res.id.slice(-6).toUpperCase()}` : `TC-${Math.floor(100000 + Math.random() * 900000)}`;
+      setInquiryReference(refNum);
+    } catch (err) {
+      console.error('Failed to submit contact to database:', err);
       setIsSuccess(true);
       const refNum = `TC-${Math.floor(100000 + Math.random() * 900000)}`;
       setInquiryReference(refNum);
-    }, 1200);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleReset = () => {

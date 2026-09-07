@@ -1,0 +1,170 @@
+{
+  "entities": {
+    "inquiry": {
+      "title": "Inquiry",
+      "description": "A customer project quote inquiry or contact form submission",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the inquiry"
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Full name of the contact person",
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the client",
+          "maxLength": 150
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number of the client",
+          "maxLength": 50
+        },
+        "projectType": {
+          "type": "string",
+          "description": "Type of construction project",
+          "maxLength": 100
+        },
+        "budget": {
+          "type": "string",
+          "description": "Estimated budget bracket",
+          "maxLength": 100
+        },
+        "timeline": {
+          "type": "string",
+          "description": "Anticipated project timeline",
+          "maxLength": 100
+        },
+        "location": {
+          "type": "string",
+          "description": "Project site location or suburb",
+          "maxLength": 200
+        },
+        "message": {
+          "type": "string",
+          "description": "Project details or brief",
+          "maxLength": 2000
+        },
+        "source": {
+          "type": "string",
+          "description": "Source of submission",
+          "enum": ["quote_modal", "contact_section", "estimator"],
+          "maxLength": 50
+        },
+        "status": {
+          "type": "string",
+          "description": "Processing status of inquiry",
+          "enum": ["new", "reviewed", "contacted", "quoted", "archived"],
+          "maxLength": 50
+        },
+        "attachmentUrl": {
+          "type": "string",
+          "description": "Download URL of document uploaded to Firebase Storage",
+          "maxLength": 1000
+        },
+        "attachmentName": {
+          "type": "string",
+          "description": "Original file name of the document uploaded to Firebase Storage",
+          "maxLength": 250
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Server timestamp of creation"
+        }
+      },
+      "required": ["fullName", "email", "message", "source", "status", "createdAt"]
+    },
+    "estimate": {
+      "title": "Estimate",
+      "description": "Saved construction cost estimate calculation",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the estimate"
+        },
+        "projectCategory": {
+          "type": "string",
+          "description": "Category of project (commercial, residential, fitout, etc.)",
+          "maxLength": 100
+        },
+        "projectSubtype": {
+          "type": "string",
+          "description": "Subtype designation",
+          "maxLength": 100
+        },
+        "floorArea": {
+          "type": "number",
+          "description": "Total gross floor area in square meters"
+        },
+        "qualityTier": {
+          "type": "string",
+          "description": "Specification level",
+          "maxLength": 50
+        },
+        "estimatedMin": {
+          "type": "number",
+          "description": "Low range estimation in AUD"
+        },
+        "estimatedMax": {
+          "type": "number",
+          "description": "High range estimation in AUD"
+        },
+        "clientName": {
+          "type": "string",
+          "description": "Optional prospective client name",
+          "maxLength": 100
+        },
+        "clientEmail": {
+          "type": "string",
+          "description": "Client email to send copy",
+          "maxLength": 150
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Server timestamp of estimate generation"
+        }
+      },
+      "required": ["projectCategory", "floorArea", "qualityTier", "estimatedMin", "estimatedMax", "createdAt"]
+    },
+    "team_photo": {
+      "title": "Team Photo",
+      "description": "Custom uploaded team photo stored in Firebase Storage",
+      "type": "object",
+      "properties": {
+        "memberId": {
+          "type": "string",
+          "description": "ID of team member (e.g. sohail)"
+        },
+        "photoUrl": {
+          "type": "string",
+          "description": "Firebase Storage download URL of the photo",
+          "maxLength": 1000
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Server timestamp of upload"
+        }
+      },
+      "required": ["memberId", "photoUrl", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/inquiries/{inquiryId}": {
+      "schema": "inquiry",
+      "description": "Collection of client quote inquiries and contact submissions"
+    },
+    "/estimates/{estimateId}": {
+      "schema": "estimate",
+      "description": "Collection of saved construction cost estimates"
+    },
+    "/team_photos/{memberId}": {
+      "schema": "team_photo",
+      "description": "Collection of customized team member photos stored in Firebase Storage"
+    }
+  }
+}
